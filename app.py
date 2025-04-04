@@ -32,20 +32,44 @@ app.secret_key = os.getenv("FLASK_SECRET")
 
 def init_db():
     database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
-    print(f"Initializing database at: {database_path}")
     conn = sqlite3.connect(database_path)
     c = conn.cursor()
-    # Comment out DROP TABLE to preserve data for testing
-    # c.execute('''DROP TABLE IF EXISTS payments''')
-    c.execute('''CREATE TABLE IF NOT EXISTS payments 
-                 (id INTEGER PRIMARY KEY, username TEXT, amount REAL, city TEXT, timestamp TEXT)''')
+
     c.execute('''
-    CREATE TABLE IF NOT EXISTS paypal_orders (
-        order_id TEXT PRIMARY KEY,
-        custom_id TEXT)
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY,
+            username TEXT,
+            amount REAL,
+            city TEXT,
+            timestamp TEXT
+        )
     ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS paypal_orders (
+            order_id TEXT PRIMARY KEY,
+            custom_id TEXT
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS pending_cities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            submitted_by TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS approved_cities (
+            name TEXT PRIMARY KEY
+        )
+    ''')
+
     conn.commit()
     conn.close()
+
 
 init_db()
 sweden_cities = [
@@ -667,3 +691,27 @@ def stripe_webhook():
     return '', 200
 
 
+@app.route('/admin/manual-add', methods=['POST'])
+def manual_add():
+    if not session.get('admin'):
+        return redirect(url_for('login'))
+
+    username = request.form.get('username')
+    amount = request.form.get('amount')
+    city = request.form.get('city')
+
+    try:
+        amount = float(amount)
+    except ValueError:
+        return "Ogiltigt belopp"
+
+    conn = sqlite3.connect(DATABASE_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO payments (username, amount, city, timestamp)
+        VALUES (?, ?, ?, ?)
+    """, (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('admin'))

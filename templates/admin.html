@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
-
 </head>
 <body>
     <div class="content">
@@ -20,8 +19,6 @@
                     <li><a href="/">Startsida</a></li>
                     <li><a href="/faq">FAQ</a></li>
                     <li><a href="/disclaimer">Hur funkar det?</a></li>
-
-
                 </ul>
             </nav>
             <nav class="secondary-nav">
@@ -33,34 +30,50 @@
             </nav>
         </div>
     </header>
-<section class="block">
-    <h1>Godkänn nya städer</h1>
 
-    <form method="POST">
-        <table>
-            <thead>
-                <tr>
-                    <th>✔</th>
-                    <th>Stad</th>
-                    <th>Inskickad av</th>
-                    <th>Datum</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for id, name, submitted_by, timestamp in pending %}
-                <tr>
-                    <td><input type="checkbox" name="approve" value="{{ id }}"></td>
-                    <td>{{ name }}</td>
-                    <td>{{ submitted_by }}</td>
-                    <td>{{ timestamp }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <br>
-        <button type="submit">Godkänn valda</button>
-    </form>
-</section>
+    <section class="block">
+        <h1>Godkänn nya städer</h1>
+        <form method="POST">
+            <table>
+                <thead>
+                    <tr>
+                        <th>✔</th>
+                        <th>Stad</th>
+                        <th>Inskickad av</th>
+                        <th>Datum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for id, name, submitted_by, timestamp in pending %}
+                    <tr>
+                        <td><input type="checkbox" name="approve" value="{{ id }}"></td>
+                        <td>{{ name }}</td>
+                        <td>{{ submitted_by }}</td>
+                        <td>{{ timestamp }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <br>
+            <button type="submit">Godkänn valda</button>
+        </form>
+    </section>
+
+    <section class="block">
+        <h1>Lägg till manuell donation</h1>
+        <form method="POST" action="/admin/manual-add">
+            <label for="username">Användarnamn:</label><br>
+            <input type="text" name="username" required><br><br>
+
+            <label for="amount">Belopp (SEK):</label><br>
+            <input type="number" name="amount" step="0.01" required><br><br>
+
+            <label for="city">Stad:</label><br>
+            <input type="text" name="city" required><br><br>
+
+            <button type="submit">Lägg till</button>
+        </form>
+    </section>
 </div>
 </body>
 
@@ -71,5 +84,4 @@
     <a href="/faq">FAQ</a>
     <a href="/privacy_policy">Integritetspolicy</a>
 </footer>
-
 </html>
