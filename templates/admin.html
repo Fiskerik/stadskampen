@@ -74,9 +74,68 @@
             <button type="submit">Lägg till</button>
         </form>
     </section>
+    <section class="block">
+        <h2>Ändra poster</h2>
+        <table>
+          <thead>
+            <tr><th>Användare</th><th>Belopp</th><th>Stad</th><th>Hälsning</th><th>Timestamp</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for row in payments %}
+            <tr id="row-{{ row.id }}">
+                <form method="POST" action="{{ url_for('update_payment') }}" id="form-{{ row.id }}">
+                  <td><input type="text" name="username" value="{{ row.username }}" disabled></td>
+                  <td><input type="number" step="0.01" name="amount" value="{{ row.amount }}" disabled></td>
+                  <td><input type="text" name="city" value="{{ row.city }}" disabled></td>
+                  <td><input type="text" name="message" value="{{ row.message }}" disabled></td>
+                  <td>{{ row.timestamp }}</td>
+                  <td>
+                    <input type="hidden" name="id" value="{{ row.id }}">
+                    <button type="button" onclick="enableEdit('{{ row.id }}')" id="edit-btn-{{ row.id }}">Redigera</button>
+                    <button type="submit" style="display: none;" id="save-btn-{{ row.id }}">Spara</button>
+                    <button type="button" onclick="deleteRow('{{ row.id }}')" style="margin-left: 5px;">❌</button>
+                    
+                  </td>
+                </form>
+              </tr>              
+            {% endfor %}
+          </tbody>
+        </table>
+        
+        <div class="pagination">
+          {% for p in range(1, total_pages + 1) %}
+            <a href="{{ url_for('admin_edit_payments', page=p) }}">{{ p }}</a>
+          {% endfor %}
+        </div>
+
+    </section>
 </div>
 </body>
-
+<script>
+    function enableEdit(id) {
+        const row = document.getElementById(`row-${id}`);
+        const form = document.getElementById(`form-${id}`);
+        row.classList.add('edited');
+        [...form.elements].forEach(el => {
+            if (el.name !== "id") el.disabled = false;
+        });
+        document.getElementById(`edit-btn-${id}`).style.display = 'none';
+        document.getElementById(`save-btn-${id}`).style.display = 'inline-block';
+    }
+    
+    function deleteRow(id) {
+        if (confirm("Är du säker på att du vill ta bort denna post?")) {
+            fetch("/admin/delete-payment", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            }).then(res => {
+                if (res.ok) location.reload();
+                else alert("Fel vid borttagning.");
+            });
+        }
+    }
+    </script>
 <footer class="block" style="text-align: center;">
     <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
     <br>

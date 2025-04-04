@@ -57,14 +57,20 @@ def init_db():
 init_db()
 
 sweden_cities = [
-    "Stockholm", "Göteborg", "Malmö", "Uppsala", "Linköping", "Örebro", 
-    "Västerås", "Helsingborg", "Norrköping", "Jönköping", "Umeå"
+    "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro",
+    "Linköping", "Helsingborg", "Jönköping", "Norrköping", "Lund",
+    "Umeå", "Gävle", "Borås", "Eskilstuna", "Södertälje", "Karlstad",
+    "Halmstad", "Växjö", "Sundsvall", "Luleå", "Trollhättan", "Östersund",
+    "Borlänge", "Kristianstad", "Kalmar", "Skövde", "Karlskrona", "Falun"
 ]
 
 def get_approved_cities():
     predefined = [
-        "Stockholm", "Göteborg", "Malmö", "Uppsala", "Linköping", "Örebro", 
-        "Västerås", "Helsingborg", "Norrköping", "Jönköping", "Umeå"
+        "Stockholm", "Göteborg", "Malmö", "Uppsala", "Västerås", "Örebro",
+        "Linköping", "Helsingborg", "Jönköping", "Norrköping", "Lund",
+        "Umeå", "Gävle", "Borås", "Eskilstuna", "Södertälje", "Karlstad",
+        "Halmstad", "Växjö", "Sundsvall", "Luleå", "Trollhättan", "Östersund",
+        "Borlänge", "Kristianstad", "Kalmar", "Skövde", "Karlskrona", "Falun"
     ]
     conn = get_db_connection()
     c = conn.cursor()
@@ -591,6 +597,70 @@ def manual_add():
     conn.close()
 
     return redirect(url_for('admin'))
+
+@app.route('/admin/edit-payments', methods=['GET'])
+def admin_edit_payments():
+    if not session.get('admin'):
+        return redirect(url_for('login'))
+
+    page = int(request.args.get('page', 1))
+    per_page = 10
+    offset = (page - 1) * per_page
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM payments
+        ORDER BY timestamp DESC
+        LIMIT %s OFFSET %s
+    """, (per_page, offset))
+    payments = c.fetchall()
+
+    c.execute("SELECT COUNT(*) FROM payments")
+    total = c.fetchone()['count']
+    total_pages = (total + per_page - 1) // per_page
+    conn.close()
+
+    return render_template("admin_edit.html", payments=payments, page=page, total_pages=total_pages)
+
+@app.route('/admin/update-payment', methods=['POST'])
+def update_payment():
+    if not session.get('admin'):
+        return redirect(url_for('login'))
+
+    payment_id = request.form['id']
+    username = request.form['username']
+    amount = float(request.form['amount'])
+    city = request.form['city']
+    message = request.form['message']
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE payments 
+        SET username = %s, amount = %s, city = %s, message = %s 
+        WHERE id = %s
+    """, (username, amount, city, message, payment_id))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('admin_edit_payments'))
+
+@app.route('/admin/delete-payment', methods=['POST'])
+def delete_payment():
+    data = request.get_json()
+    payment_id = data.get('id')
+
+    if not payment_id:
+        return jsonify({'error': 'Missing ID'}), 400
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM payments WHERE id = %s", (payment_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'status': 'deleted'})
 
 
 if __name__ == "__main__":
