@@ -103,7 +103,9 @@
 
             <label>Belopp:</label><br>
             <input type="number" step="1" min="10" name="amount" id="amount" required placeholder="Ange belopp (minimum 10 SEK)"><br>
-
+            <label for="message">Kommentar / Hälsning (valfritt):</label><br>
+            <textarea name="message" id="message" rows="3" placeholder="Skriv en hälsning eller kommentar (om du vill) 🙌"></textarea><br>
+            <input type="text" id="custom_city" name="custom_city" placeholder="e.g. Hogwarts FC">
             <label for="city">Stad (Valfritt):</label><br>
             <select name="city" id="city">
                 <option value="">Inget</option>
@@ -203,19 +205,21 @@
                     <th>Användarnamn</th>
                     <th>Stad</th>
                     <th>Totalt belopp (SEK)</th>
+                    <th>Kommentar</th> <!-- 🆕 -->
                 </tr>
             </thead>
             <tbody>
-                {% for rank, username, city, amount in leaderboard %}
+                {% for rank, username, city, amount, message in leaderboard %}
                 <tr>
-                    <!-- Apply rank class to the rank td -->
                     <td class="rank-{{ rank }}">{{ rank }}</td>
                     <td>{{ username }}</td>
                     <td>{{ city }}</td>
                     <td>{{ amount }}</td>
+                    <td>{{ message or '' }}</td> <!-- 🆕 Visa hälsning -->
                 </tr>
                 {% endfor %}
             </tbody>
+            
         </table>
         
 
@@ -283,7 +287,7 @@
               <div class="grid-item">
                 <div class="emoji">📈</div>
                 <h3>Status</h3>
-                <p>Använd samma användarnamn eller gå ihop ett gäng för att klättra till toppen.</p>
+                <p>Använd samma användarnamn för att boosta dig själv, en kompis eller gå ihop ett gäng för att klättra till toppen tillsammans.</p>
               </div>
               <div class="grid-item">
                 <div class="emoji">👑</div>
@@ -293,7 +297,7 @@
               <div class="grid-item">
                 <div class="emoji">🌱</div>
                 <h3>Välgörenhet</h3>
-                <p>10% av alla erhållna bidrag doneras varje kvartal till en stiftelse eller förening enligt #1</p>
+                <p>10% av alla erhållna bidrag doneras varje kvartal till en stiftelse eller förening som #1 väljer.</p>
               </div>
             </div>
           </section>

@@ -112,18 +112,21 @@ def index():
     city_offset = (city_page - 1) * items_per_page
 
     c.execute("""
-        SELECT username, (
-            SELECT city 
-            FROM payments p2 
-            WHERE p2.username = p1.username 
-            ORDER BY p2.timestamp DESC 
-            LIMIT 1
-        ) AS latest_city, SUM(amount) as total
-        FROM payments p1 
-        GROUP BY username 
-        ORDER BY total DESC 
+        SELECT p1.username,
+            MAX(p1.city) AS latest_city,
+            MAX(p1.message) FILTER (WHERE p1.timestamp = sub.latest_timestamp) AS latest_message,
+            SUM(p1.amount) AS total
+        FROM payments p1
+        JOIN (
+            SELECT username, MAX(timestamp) AS latest_timestamp
+            FROM payments
+            GROUP BY username
+        ) sub ON sub.username = p1.username
+        GROUP BY p1.username
+        ORDER BY total DESC
         LIMIT %s OFFSET %s
     """, (items_per_page, player_offset))
+
 
     leaderboard = [
         (
@@ -131,12 +134,15 @@ def index():
             "👑 " + row['username'] if row['total'] >= 1000 else
             "💎 " + row['username'] if row['total'] >= 500 else
             "💰 " + row['username'] if row['total'] >= 100 else
+            "💵 " + row['username'] if row['total'] >= 50 else
             row['username'],
             row['latest_city'],
-            row['total']
+            row['total'],
+            row['latest_message']  # 🆕 Hälsning
         )
         for i, row in enumerate(c.fetchall())
     ]
+
 
     c.execute("SELECT COUNT(DISTINCT username) FROM payments")
     total_players = c.fetchone()['count']
@@ -229,7 +235,9 @@ def pay():
     amount = float(request.form['amount'])
     city = request.form.get('city')
     custom_city = request.form.get('custom_city')
+    message = request.form.get('message')
 
+    # Hantera specialfallet där custom stad anges
     if city and city.lower() in ['other', 'annan'] and custom_city and custom_city.strip():
         conn = get_db_connection()
         c = conn.cursor()
@@ -239,12 +247,23 @@ def pay():
         )
         conn.commit()
         conn.close()
+        city = 'Other'
 
-    city = 'Other' if city and city.lower() in ['other', 'annan'] else city
     if city == 'None' or not city:
         city = None
 
+    # Spara betalningen (inkl. hälsning)
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO payments (username, amount, city, timestamp, message)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
+    conn.commit()
+    conn.close()
+
     return redirect(url_for('payment_page', username=username, amount=amount, city=city))
+
 
 @app.route('/payment')
 def payment_page():
@@ -258,6 +277,7 @@ def process_payment():
     username = request.form.get('username')
     amount = request.form.get('amount')
     city = request.form.get('city')
+    message = request.form.get('message')  # 🆕 Nytt fält
     payment_method = request.form.get('payment_method')
 
     if not username or not amount:
@@ -279,8 +299,10 @@ def process_payment():
 
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
-              (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    c.execute("""
+        INSERT INTO payments (username, amount, city, timestamp, message)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
     conn.commit()
     conn.close()
 
@@ -567,6 +589,27 @@ def manual_add():
     conn.close()
 
     return redirect(url_for('admin'))
+
+@app.route('/init-add-message-column')
+def init_add_message_column():
+    if not session.get('admin'):
+        return redirect(url_for('login'))  # Säkerhetskontroll
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("ALTER TABLE payments ADD COLUMN message TEXT")
+        conn.commit()
+        return "✅ Kolumn 'message' har lagts till!"
+    except psycopg2.errors.DuplicateColumn:
+        conn.rollback()
+        return "ℹ️ Kolumnen 'message' finns redan."
+    except Exception as e:
+        conn.rollback()
+        return f"❌ Något gick fel: {e}"
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     init_db()
