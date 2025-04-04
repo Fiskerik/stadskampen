@@ -685,3 +685,33 @@ nav a:hover {
 .left-aligned h3 {
     text-align: left;
 }
+.why-pay-section {
+    padding: 40px 20px;
+    background: #f9f9f9;
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    max-width: 1000px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.grid-item {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.grid-item img {
+    height: 40px;
+    margin-bottom: 12px;
+}
+@media (max-width: 768px) {
+    .grid-container {
+        grid-template-columns: 1fr;
+    }
+}
