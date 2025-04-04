@@ -456,40 +456,37 @@ def create_paypal_order():
     approval_url = next(link['href'] for link in order['links'] if link['rel'] == 'approve')
     return {'approval_url': approval_url}
 
-@app.route('/admin', methods=['GET', 'POST'])
+@app.route('/admin')
 def admin():
     if not session.get('admin'):
         return redirect(url_for('login'))
 
+    page = int(request.args.get('page', 1))
+    per_page = 10
+    offset = (page - 1) * per_page
+
     conn = get_db_connection()
     c = conn.cursor()
 
-    if request.method == 'POST':
-        approved_ids = request.form.getlist('approve')
-        for city_id in approved_ids:
-            c.execute("SELECT name, submitted_by FROM pending_cities WHERE id = %s", (city_id,))
-            result = c.fetchone()
-            if result:
-                city_name = result['name']
-                submitted_by = result['submitted_by']
-                c.execute("INSERT INTO approved_cities (name) VALUES (%s) ON CONFLICT DO NOTHING", (city_name,))
-                c.execute("""
-                    UPDATE payments 
-                    SET city = %s 
-                    WHERE city = 'Övrig' AND username = %s
-                """, (city_name, submitted_by))
-                c.execute("DELETE FROM pending_cities WHERE id = %s", (city_id,))
-        conn.commit()
-
-    # Fetch pending cities
+    # Pending cities
     c.execute("SELECT id, name, submitted_by, timestamp FROM pending_cities")
     pending = c.fetchall()
 
-    # Fake total_pages = 1 if you don't use pagination yet
-    total_pages = 1
+    # Payments
+    c.execute("SELECT * FROM payments ORDER BY timestamp DESC LIMIT %s OFFSET %s", (per_page, offset))
+    payments = c.fetchall()
+    c.execute("SELECT * FROM payments ORDER BY timestamp DESC LIMIT 10")
+    payments = c.fetchall()
+
+
+    c.execute("SELECT COUNT(*) FROM payments")
+    total = c.fetchone()['count']
+    total_pages = (total + per_page - 1) // per_page
 
     conn.close()
-    return render_template('admin.html', pending=pending, total_pages=total_pages)
+    return render_template('admin.html', pending=pending, payments=payments, page=page, total_pages=total_pages)
+
+
 
 
 @app.route('/create-checkout-session', methods=['POST'])
