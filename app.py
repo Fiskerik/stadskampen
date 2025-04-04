@@ -27,7 +27,7 @@ app = Flask(__name__)
 DATABASE_PATH = os.getenv("DATABASE_PATH", "/data/database.db")
 app.secret_key = os.getenv("FLASK_SECRET")
 
-@app.before_first_request
+@app._got_first_request
 def initialize():
     init_db()
 
