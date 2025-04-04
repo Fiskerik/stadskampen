@@ -24,7 +24,7 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 
 app = Flask(__name__)
-DATABASE_PATH = os.getenv("DATABASE_PATH", "/data/database.db")
+DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "database.db"))
 app.secret_key = os.getenv("FLASK_SECRET")
 
 
@@ -67,7 +67,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    
+
 init_db()
 
 sweden_cities = [
