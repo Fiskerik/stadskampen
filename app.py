@@ -24,7 +24,7 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 
 app = Flask(__name__)
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
+DATABASE_PATH = os.getenv("DATABASE_PATH", "/data/database.db")
 app.secret_key = os.getenv("FLASK_SECRET")
 
 
@@ -32,9 +32,9 @@ app.secret_key = os.getenv("FLASK_SECRET")
 
 def init_db():
     database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
-    conn = sqlite3.connect(database_path)
+    conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
-
+    print(f"Initializing DB at: {DATABASE_PATH}")
     c.execute('''
         CREATE TABLE IF NOT EXISTS payments (
             id INTEGER PRIMARY KEY,
@@ -98,7 +98,7 @@ def get_approved_cities():
     return combined
 
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
