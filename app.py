@@ -72,7 +72,7 @@ init_db()
 
 sweden_cities = [
     "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
-    "Västerås", "Helsingborg", "Norrköping", "Jönköping"
+    "Västerås", "Helsingborg", "Norrköping", "Jönköping", "Umeå"
 ]
 
 def get_approved_cities():
