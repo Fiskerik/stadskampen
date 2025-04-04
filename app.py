@@ -4,8 +4,8 @@ import os
 import stripe
 import requests
 from requests.auth import HTTPBasicAuth
-import psycopg2
-import psycopg2.extras
+import psycopg2 # type: ignore
+import psycopg2.extras # type: ignore
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET")
@@ -57,14 +57,14 @@ def init_db():
 init_db()
 
 sweden_cities = [
-    "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
+    "Stockholm", "Göteborg", "Malmö", "Uppsala", "Linköping", "Örebro", 
     "Västerås", "Helsingborg", "Norrköping", "Jönköping", "Umeå"
 ]
 
 def get_approved_cities():
     predefined = [
-        "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
-        "Västerås", "Helsingborg", "Norrköping", "Jönköping"
+        "Stockholm", "Göteborg", "Malmö", "Uppsala", "Linköping", "Örebro", 
+        "Västerås", "Helsingborg", "Norrköping", "Jönköping", "Umeå"
     ]
     conn = get_db_connection()
     c = conn.cursor()
@@ -72,9 +72,9 @@ def get_approved_cities():
     user_approved = [row['name'] for row in c.fetchall()]
     conn.close()
     combined = sorted(set(predefined + user_approved), key=str.lower)
-    if "Other" in combined:
-        combined.remove("Other")
-        combined.append("Other")
+    if "Övrig" in combined:
+        combined.remove("Övrig")
+        combined.append("Övrig")
     return combined
 
 @app.before_request
@@ -238,7 +238,7 @@ def pay():
     message = request.form.get('message')
 
     # Hantera specialfallet där custom stad anges
-    if city and city.lower() in ['other', 'annan'] and custom_city and custom_city.strip():
+    if city and city.lower() in ['övrig', 'annan'] and custom_city and custom_city.strip():
         conn = get_db_connection()
         c = conn.cursor()
         c.execute(
@@ -247,7 +247,7 @@ def pay():
         )
         conn.commit()
         conn.close()
-        city = 'Other'
+        city = 'Övrig'
 
     if city == 'None' or not city:
         city = None
@@ -394,7 +394,7 @@ def create_paypal_order():
         parts = city.split('|')
         if len(parts) == 2:
             raw_city = parts[1]
-            if raw_city.lower() not in [c.lower() for c in sweden_cities] and raw_city.lower() != 'other':
+            if raw_city.lower() not in [c.lower() for c in sweden_cities] and raw_city.lower() != 'övrig':
                 conn = get_db_connection()
                 c = conn.cursor()
                 c.execute(
@@ -470,7 +470,7 @@ def admin():
                 c.execute("""
                     UPDATE payments 
                     SET city = %s 
-                    WHERE city = 'Other' AND username = %s
+                    WHERE city = 'Övrig' AND username = %s
                 """, (city_name, submitted_by))
                 c.execute("DELETE FROM pending_cities WHERE id = %s", (city_id,))
         conn.commit()
@@ -487,7 +487,7 @@ def create_checkout_session():
     city = request.form.get('city')
     custom_city = request.form.get('custom_city', '').strip()
 
-    if city.lower() in ['other', 'annan'] and custom_city:
+    if city.lower() in ['övrig', 'annan'] and custom_city:
         conn = get_db_connection()
         c = conn.cursor()
         c.execute(
@@ -496,7 +496,7 @@ def create_checkout_session():
         )
         conn.commit()
         conn.close()
-        city = 'Other'
+        city = 'Övrig'
 
     session_obj = stripe.checkout.Session.create(
         payment_method_types=['card'],
@@ -547,24 +547,22 @@ def stripe_webhook():
     except Exception as e:
         return str(e), 400
 
-    if event['type'] == 'checkout.session.completed':
-        session_data = event['data']['object']
+    if event['type'] == 'payment_intent.succeeded':
+        intent = event['data']['object']
+        metadata = intent.get('metadata', {})
+        username = metadata.get('username')
+        amount = float(metadata.get('amount'))
+        city = metadata.get('city')
+        message = metadata.get('message')  # Optional
 
-        # ✅ Only proceed if payment was successful
-        if session_data.get("payment_status") == "paid":
-            metadata = session_data.get('metadata', {})
-            username = metadata.get('username')
-            amount = float(metadata.get('amount'))
-            city = metadata.get('city')
-
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute(
-                "INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
-                (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            )
-            conn.commit()
-            conn.close()
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO payments (username, amount, city, timestamp, message) VALUES (%s, %s, %s, %s, %s)",
+            (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message)
+        )
+        conn.commit()
+        conn.close()
 
     return '', 200
 
