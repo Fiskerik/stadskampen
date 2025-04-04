@@ -88,6 +88,21 @@ table, th, td {
     border: 1px solid #ddd; /* Light gray border */
 }
 
+table td, table th {
+    padding: 8px;
+    vertical-align: middle;
+    text-align: left;
+}
+table input[type="text"],
+table input[type="number"] {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 4px 6px;
+    font-size: 14px;
+}
+
+
 th, td {
     padding: 10px;
     text-align: left;
