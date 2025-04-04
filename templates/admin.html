@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Pending Cities</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+</head>
+<body>
+    <div class="content">
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo-link">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Stadskampen Logo" class="logo">
+            </a>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="/">Startsida</a></li>
+                    <li><a href="/faq">FAQ</a></li>
+                    <li><a href="/disclaimer">Hur funkar det?</a></li>
+
+
+                </ul>
+            </nav>
+            <nav class="secondary-nav">
+                <ul class="nav-list">    
+                    {% if session.get('admin') %}
+                    <li><a href="{{ url_for('logout') }}">Logga ut</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </header>
+<section class="block">
+    <h1>Godkänn nya städer</h1>
+
+    <form method="POST">
+        <table>
+            <thead>
+                <tr>
+                    <th>✔</th>
+                    <th>Stad</th>
+                    <th>Inskickad av</th>
+                    <th>Datum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for id, name, submitted_by, timestamp in pending %}
+                <tr>
+                    <td><input type="checkbox" name="approve" value="{{ id }}"></td>
+                    <td>{{ name }}</td>
+                    <td>{{ submitted_by }}</td>
+                    <td>{{ timestamp }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <button type="submit">Godkänn valda</button>
+    </form>
+</section>
+</div>
+</body>
+
+<footer class="block" style="text-align: center;">
+    <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
+    <br>
+    <a href="/">Startsida</a>
+    <a href="/faq">FAQ</a>
+    <a href="/privacy_policy">Integritetspolicy</a>
+</footer>
+
+</html>

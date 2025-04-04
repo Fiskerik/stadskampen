@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Hur fungerar det?</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+</head>
+<body class="content">
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo-link">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Stadskampen Logo" class="logo">
+            </a>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="/">Startsida</a></li>
+                    <li><a href="/faq">FAQ</a></li>
+                    <li><a href="/disclaimer">Hur funkar det?</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <!-- Block 1: Header -->
+    <section class="block">
+        <h1>Hur fungerar det?</h1>
+        <p>Lär dig hur du blir en stadskämpe – med enbart din plånbok som verktyg!</p>
+
+        <img src="{{ url_for('static', filename='images/bild1.png') }}" alt="bild" class="bild">
+    </section>
+    <!-- Block 3: Steps -->
+    <section class="block">
+        <h2>Så här går det till</h2>
+        <div class="steps-container">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Välj belopp</h3>
+                <p>Bestäm hur mycket du vill bidra med. <br>Ju mer du spenderar, desto högre upp klättrar du på topplistan.</p>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>Välj en stad (valfritt)</h3>
+                <p>Bidra till din favoritstads totala poäng och hjälp den att klätrra i topplistan – eller kör helt solo.</p>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Bidra med valfritt belopp & klättra i topplistorna</h3>
+                <p>Din betalning hanteras säkert och din poäng registreras inom något minut på topplistan.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Block 3: Call to Action -->
+    <section class="block">
+        <h2>Redo att bidra?</h2>
+        <p><a href="{{ url_for('index') }}" class="cta-button">Nu kör vi!</a></p>
+    </section>
+</body>
+
+<footer class="block" style="text-align: center;">
+    <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
+    <br>
+    <a href="/">Startsida</a>
+    <a href="/faq">FAQ</a>
+    <a href="/privacy_policy">Integritetspolicy</a>
+</footer>
+</html>

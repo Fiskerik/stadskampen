@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stadskampen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+</head>
+<body class="content">
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo-link">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Stadskampen Logo" class="logo">
+            </a>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="/">Startsida</a></li>
+                    <li><a href="/faq">FAQ</a></li>
+                    <li><a href="/disclaimer">Hur funkar det?</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    
+<!-- Block 1: Info -->
+<section class="block info-flex">
+    <div class="info-image">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="bild" class="info-bild">
+    </div>
+    <div class="info-text">
+        <h1>Välkommen till Stadskampen!</h1>
+        <p class="centered-text">Bidra till din favoritstads placering i topplistan. <br> Kräver inga förkunskaper eller erfarenhet - bara donationer!</p>
+    </div>
+</section>
+
+    <!-- Block: City Gallery -->
+
+{% set medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'] %}
+        <!-- City Gallery Block -->
+<section class="block city-gallery">
+    <h2>Placering</h2>
+
+    <!-- Rad 1 -->
+    {% if city_leaderboard|length > 0 %}
+    <div class="gallery-row full-width">
+        {% set city_name = city_leaderboard[0][1] %}
+        <div class="gallery-image">
+            <img src="{{ url_for('static', filename='images/' ~ (city_name.lower() if city_name.lower() in available_images else 'placeholder') ~ '.jpg') }}"
+                 alt="{{ city_name }}">
+                 <div class="ranking-overlay overlay-large">
+                    {{ medals[0] }} {{ city_name }} – {{ city_leaderboard[0][3]|round(0) }} SEK
+                </div>
+                
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Rad 2 -->
+    {% if city_leaderboard|length > 2 %}
+    <div class="gallery-row two-images">
+        {% for i in range(1, 3) %}
+        {% set city_name = city_leaderboard[i][1] %}
+        <div class="gallery-image">
+            <img src="{{ url_for('static', filename='images/' ~ (city_name.lower() if city_name.lower() in available_images else 'placeholder') ~ '.jpg') }}"
+                 alt="{{ city_name }}">
+                 <div class="ranking-overlay overlay-medium">
+                    {{ medals[i] }} {{ city_name }} – {{ city_leaderboard[i][3]|round(0) }} SEK
+                </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Rad 3 -->
+    {% if city_leaderboard|length > 5 %}
+    <div class="gallery-row three-images">
+        {% for i in range(3, 6) %}
+        {% set city_name = city_leaderboard[i][1] %}
+        <div class="gallery-image">
+            <img src="{{ url_for('static', filename='images/' ~ (city_name.lower() if city_name.lower() in available_images else 'placeholder') ~ '.jpg') }}"
+                 alt="{{ city_name }}">
+                 <div class="ranking-overlay overlay-small">
+                    {{ medals[i] }} {{ city_name }} – {{ city_leaderboard[i][3]|round(0) }} SEK
+                </div>
+                
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+
+
+
+    <!-- Block 2: Form -->
+    <section class="block">
+        <h2>Ange dina uppgifter</h2>
+        <form method="POST" action="{{ url_for('pay') }}" id="payment-form">
+            <label for="username">Användarnamn (minst 3 tecken):</label><br>
+            <input type="text" name="username" id="username" placeholder="Ange Användarnamn" required><br>
+
+            <label>Belopp:</label><br>
+            <input type="number" step="1" min="10" name="amount" id="amount" required placeholder="Ange belopp (minimum 10 SEK)"><br>
+
+            <label for="city">Stad (Valfritt):</label><br>
+            <select name="city" id="city">
+                <option value="">Inget</option>
+                <option value="Annan">Annan stad (fyll i själv)</option> <!-- viktig -->
+                {% for city in cities %}
+                    <option value="{{ city }}">{{ city }}</option>
+                {% endfor %}
+                
+            </select><br>
+            <div id="custom-city-container" style="display: none; margin-top: 10px;">
+                <label for="custom_city">Skriv in din stad:</label><br>
+                <input type="text" id="custom_city" name="custom_city" placeholder="e.g. Hogwarts FC">
+            </div>
+            
+            <p id="amount-warning" style="color: red; display: none;">Minsta belopp är 10 SEK.</p>
+
+            <button type="submit" id="pay-button">Placera din stad i topp!</button>
+        </form>
+
+    </section>
+    <script>
+        // Make sure that at least 10 SEK is added before button becomes active
+        const warning = document.getElementById("amount-warning");
+        const amountInput = document.getElementById("amount");
+        const payButton = document.getElementById("pay-button");
+
+
+        amountInput.addEventListener("input", function () {
+            const value = parseFloat(this.value);
+            if (value >= 10) {
+                payButton.disabled = false;
+                warning.style.display = "none";
+            } else {
+                payButton.disabled = true;
+                warning.style.display = "block";
+            }
+        });
+
+
+    
+        // Already in DOMContentLoaded context
+        document.getElementById('payment-form').addEventListener('submit', function (event) {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const warningMessage = document.getElementById('warning-message');
+            const submitButton = document.getElementById('pay-button');
+    
+            if (amount < 1) {
+                event.preventDefault();
+                warningMessage.style.display = "block";
+                const rect = submitButton.getBoundingClientRect();
+                warningMessage.style.left = `${rect.left + rect.width + 10}px`;
+                warningMessage.style.top = `${rect.top + window.scrollY}px`;
+            }
+        });
+
+                // Toggle "custom city" field based on selection
+        const citySelect = document.getElementById('city');
+        const customCityContainer = document.getElementById('custom-city-container');
+    
+        citySelect.addEventListener('change', function () {
+            if (this.value === 'Annan') {
+                customCityContainer.style.display = 'block';
+            } else {
+                customCityContainer.style.display = 'none';
+            }
+        });
+    </script>
+    
+    <script>
+        document.getElementById('payment-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const amount = parseFloat(document.getElementById('amount').value);
+            const warningMessage = document.getElementById('warning-message');
+            const submitButton = document.getElementById('pay-button');
+
+            if (amount < 1) {
+                warningMessage.style.display = "block";
+                const rect = submitButton.getBoundingClientRect();
+                warningMessage.style.left = `${rect.left + rect.width + 10}px`;
+                warningMessage.style.top = `${rect.top + window.scrollY}px`;
+            } else {
+                this.submit();
+            }
+        });
+    </script>
+
+    <!-- Block 3: Leaderboard -->
+    <section class="block" id="leaderboard-section">
+        <h2>Topplistor</h2>
+
+        <!-- Individual leaderboard -->
+        <h3>Topplista användare</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Placering</th>
+                    <th>Användarnamn</th>
+                    <th>Stad</th>
+                    <th>Totalt belopp (SEK)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rank, username, city, amount in leaderboard %}
+                <tr>
+                    <!-- Apply rank class to the rank td -->
+                    <td class="rank-{{ rank }}">{{ rank }}</td>
+                    <td>{{ username }}</td>
+                    <td>{{ city }}</td>
+                    <td>{{ amount }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+
+        <!-- Player Pagination -->
+        <div class="pagination">
+            {% if total_player_pages > 1 %}
+                {% for page in range(1, total_player_pages + 1) %}
+                    <a href="{{ url_for('index', player_page=page, city_page=city_page) }}" class="page-btn {% if page == player_page %}active{% endif %}">{{ page }}</a>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- City leaderboard -->
+        <h3>Topplista städer</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Placering</th>
+                    <th>Stad</th>
+                    <th>Antal donationer</th>
+                    <th>Totalt belopp (SEK)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rank, city, donation_count, amount in city_leaderboard %}
+                <tr>
+                    <!-- Apply rank class to the rank td -->
+                    <td class="rank-{{ rank }}">{{ rank }}</td>
+                    <td>{{ city }}</td>
+                    <td>{{ donation_count }}</td>
+                    <td>{{ amount|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+
+        <!-- City Pagination -->
+        <div class="pagination">
+            {% if total_city_pages > 1 %}
+                {% for page in range(1, total_city_pages + 1) %}
+                    <a href="{{ url_for('index', player_page=player_page, city_page=page) }}" class="page-btn {% if page == city_page %}active{% endif %}">{{ page }}</a>
+                {% endfor %}
+            {% endif %}
+        </div>
+        </section>
+        <script>
+            window.addEventListener('DOMContentLoaded', function () {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('player_page') || urlParams.has('city_page')) {
+                    const leaderboard = document.getElementById('leaderboard-section');
+                    if (leaderboard) {
+                        leaderboard.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+            });
+        </script>
+    
+</body>
+
+<footer class="block" style="text-align: center;">
+    <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
+    <br>
+    <a href="/">Startsida</a>
+    <a href="/faq">FAQ</a>
+    <a href="/privacy_policy">Integritetspolicy</a>
+</footer>
+</html>

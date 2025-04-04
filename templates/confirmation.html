@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Confirmation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+</head>
+<body class="content">
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo-link">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Stadskampen Logo" class="logo">
+            </a>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="/">Startsida</a></li>
+                    <li><a href="/faq">FAQ</a></li>
+                    <li><a href="/disclaimer">Hur funkar det?</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <h1>Payment Summary</h1>
+    <p>Username: {{ username }}</p>
+    <p>Amount: {{ amount }} {{ currency }}</p>
+    <p>Team: {{ team or 'Not selected' }}</p>
+    <p>Choose payment method:</p>
+    <button>Pay with PayPal</button>
+    <button>Pay with Bank Card</button>
+    <a href="{{ url_for('index') }}">Back to Home</a>
+</body>
+<footer class="block" style="text-align: center;">
+    <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
+    <br>
+    <a href="/">Startsida</a>
+    <a href="/faq">FAQ</a>
+    <a href="/privacy_policy">Integritetspolicy</a>
+</footer>
+
+</html>

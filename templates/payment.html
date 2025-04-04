@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment - Pay2Win</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+    <style>
+        .payment-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .left-pane, .right-pane {
+            width: 48%;
+            box-sizing: border-box;
+        }
+        .payment-form {
+            display: none;
+        }
+        .payment-form.active {
+            display: block;
+        }
+        @media (max-width: 600px) {
+            .left-pane, .right-pane {
+                width: 100%;
+                margin-bottom: 20px;
+            }
+        }
+        .payment-methods label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .payment-methods input[type="radio"] {
+            margin-right: 10px;
+        }
+        .payment-methods img {
+            width: 30px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body class="content">
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo-link">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Stadskampen Logo" class="logo">
+            </a>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="/">Startsida</a></li>
+                    <li><a href="/faq">FAQ</a></li>
+                    <li><a href="/disclaimer">Hur funkar det?</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <section class="block">
+        <div class="payment-container">
+            <!-- Left Pane: Payment Summary -->
+            <div class="left-pane">
+                <h2>Your Payment Details</h2>
+                <p><strong>Username:</strong> {{ username }}</p>
+                <p><strong>Amount:</strong> {{ amount }} SEK</p>
+                <p><strong>City/Team:</strong> {{ city or 'N/A' }}</p>
+            </div>
+
+            <!-- Right Pane: Payment Methods -->
+            <div class="right-pane">
+                <h2>Välj betalmetod</h2>
+                <form id="payment-form" method="POST">
+                    <div class="payment-methods">
+                      <label>
+                        <input type="radio" name="payment_method" value="Paypal" checked onchange="showForm('paypal')">
+                        <img src="{{ url_for('static', filename='images/PayPal.png') }}" alt="Paypal"> Paypal
+                      </label>
+                      <label>
+                        <input type="radio" name="payment_method" value="Stripe" onchange="showForm('stripe')">
+                        <img src="{{ url_for('static', filename='images/stripe.jpg') }}" alt="Stripe"> Kort (Stripe)
+                      </label>
+                    </div>
+                  
+                    <!-- Dold data -->
+                    <input type="hidden" name="username" id="hidden-username" value="{{ username }}">
+                    <input type="hidden" name="amount" id="hidden-amount" value="{{ amount }}">
+                    <input type="hidden" name="city" id="hidden-city" value="{{ city }}">
+                  
+                    <!-- Paypal-form -->
+                    <div id="paypal-form" class="payment-form active">
+                      <button type="button" onclick="submitPaypal()">Fortsätt med Paypal</button>
+                    </div>
+                  
+                    <!-- Stripe-form -->
+                    <div id="stripe-form" class="payment-form">
+                      <button type="submit" formaction="/create-checkout-session">Fortsätt med Stripe</button>
+                    </div>
+                  </form>
+            </div>
+        </div>
+    </section>
+    <script>
+        // Visa "annan stad"-input om det valts
+        document.querySelector('select[name="city"]').addEventListener('change', function () {
+            const input = document.getElementById('customCityInput');
+            if (this.value === 'custom') {
+                input.style.display = 'block';
+                input.required = true;
+            } else {
+                input.style.display = 'none';
+                input.required = false;
+            }
+        });
+    </script>
+<script>
+    function showForm(method) {
+      document.querySelectorAll('.payment-form').forEach(form => {
+        form.classList.remove('active');
+      });
+      document.getElementById(`${method}-form`).classList.add('active');
+    }
+  
+    function submitPaypal() {
+        const username = document.getElementById('hidden-username').value;
+        const amount = document.getElementById('hidden-amount').value;
+        let city = document.getElementById('hidden-city').value;
+        const customCity = document.getElementById('customCityInput')?.value || '';
+
+        if (city === 'Other' && customCity.trim()) {
+            city = customCity.trim(); // Ersätt med manuell stad
+        }
+
+        fetch('/create-paypal-order', {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+            username: username,
+            amount: amount,
+            city: city
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.approval_url) {
+            window.location.href = data.approval_url;
+            } else {
+            alert("Kunde inte skapa Paypal-order.");
+            }
+        });
+        }
+
+  
+    // Visa rätt formulär vid laddning
+    window.onload = function () {
+      showForm('paypal');
+    };
+  </script>
+</body>
+<footer class="block" style="text-align: center;">
+    <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
+    <br>
+    <a href="/">Startsida</a>
+    <a href="/faq">FAQ</a>
+    <a href="/privacy_policy">Integritetspolicy</a>
+</footer>
+</html>

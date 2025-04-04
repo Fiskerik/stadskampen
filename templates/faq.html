@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>FAQ - Stadskampen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/logo.png') }}" type="image/png">
+
+</head>
+<body class="content">
+    <header class="main-header">
+        <div class="header-container">
+            <a href="/" class="logo-link">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Stadskampen Logo" class="logo">
+            </a>
+            <nav class="main-nav">
+                <ul class="nav-list">
+                    <li><a href="/">Startsida</a></li>
+                    <li><a href="/faq">FAQ</a></li>
+                    <li><a href="/disclaimer">Hur funkar det?</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+<div class="content"><section class="block">
+    <section class="block faq-section">
+        <h2>Vanliga frågor</h2>
+
+        {% set faqs = [
+            ("Hur fungerar Stadskampen?", "Stadskampen möjliggör användare att visa vilken stad som är bäst! Placeringen beror enbart på hur mycket du väljer att bidra med. Det finns inget spelmoment eller extra funktioner – bara ett rakt och ärligt system där större bidrag ger en högre placering."),
+            ("Behöver man ha några förkunskaper?", "Nej, Stadskampens öde beror enbart på ditt monitära bidrag!"),
+            ("Vad kostar det?", "Du väljer själv hur mycket du vill bidra med – alla belopp räknas in i din favoritstads placering!"),
+            ("Vad vinner man?", "Ära, status och ett namn högst upp på topplistan – och chansen att dominera i ditt stadsnamn!"),
+            ("Hur förbättrar jag min placering?", "Enkelt – bidra med mer! Gör fler betalningar för att klättra högre."),
+            ("Vilka betalmetoder accepteras?", "Vi accepterar alla vanliga kredit- och betalkort. Enklast och säkrast görs det via PayPal."),
+            ("Vad händer när jag gör en betalning?", "Ditt bidrag omvandlas direkt (inom 1 minut) till poäng på topplistan."),
+            ("Kan jag lägga till poäng på någon annans konto?", "Ja! Ange en väns användarnamn vid betalning för att boosta dem."),
+            ("Vad är städerna för?", "Städer tävlar mot varandra. Ditt bidrag räknas både individuellt och till stadens totala bidrag."),
+            ("Min stad finns inte – kan jag lägga till en egen?", "Ja! Välj 'Annan' i listan och skriv in din stad. Om den godkänns visas den publikt."),
+            ("Vad betyder ikonerna?", "Utmärkelser ges för bidrag, aktivitet och milstolpar. De syns vid ditt namn.<br><br><b>Exempel på utmärkelser: </b><br><br>👑 – King (1000+ kr)<br>💎 – Diamant (500+ kr)<br>💰 – Storspenderare (100+ kr)"),
+            ("Är det här ett skämt?", "Nej – detta är en riktig plattform. Med glimten i ögat, men fullt fungerande."),
+            ("Kan jag få en återbetalning?", "Nej. Alla betalningar är slutgiltiga. Du betalar endast för poäng."),
+            ("Varför betala bara för en topplista?", "Många gillar tävlingar i alla dess former. Stadskampen är transparent, rolig och beroendeframkallande."),
+            ("Är min betalningsinformation säker?", "Ja. All betalningsinformation hanteras säkert via krypterad överföring.")
+        ] %}
+
+        {% for question, answer in faqs %}
+        <div class="faq-item">
+            <button class="faq-question">{{ loop.index }}. {{ question }} <span class="arrow">+</span></button>
+            <div class="faq-answer">
+                <p>{{ answer | safe }}</p>
+            </div>
+        </div>
+        {% endfor %}
+        
+    </section></section>
+</div>
+
+<script>
+    document.querySelectorAll('.faq-question').forEach(button => {
+        button.addEventListener('click', () => {
+            const item = button.closest('.faq-item');
+            item.classList.toggle('open');
+        });
+    });
+</script>
+
+<footer class="block" style="text-align: center;">
+    <p style="font-size: 12px; color: #888;"><i>Observera! – du köper endast poäng till topplistan. Inget mer, inget mindre. Inga återbetalningar, bara ära!</i></p>
+    <br>
+    <a href="/">Startsida</a>
+    <a href="/faq">FAQ</a>
+    <a href="/privacy_policy">Integritetspolicy</a>
+</footer>
+</body>
+</html>
