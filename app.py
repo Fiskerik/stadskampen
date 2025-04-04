@@ -1,70 +1,56 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify, json, session
-import sqlite3
 from datetime import datetime
 import os
-
 import stripe
-
 import requests
 from requests.auth import HTTPBasicAuth
+import psycopg2
+import psycopg2.extras
 
-
+app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET")
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
 
-
-
-
-# PayPal API credentials (Sandbox for now)
 PAYPAL_CLIENT_ID = os.getenv('PAYPAL_CLIENT_ID')
 PAYPAL_SECRET = os.getenv('PAYPAL_SECRET')
 PAYPAL_API_BASE = 'https://api-m.paypal.com'
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-
-
-
-app = Flask(__name__)
-DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "database.db"))
-app.secret_key = os.getenv("FLASK_SECRET")
-
+def get_db_connection():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 def init_db():
-    database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
-    print(f"Initializing DB at: {DATABASE_PATH}")
     c.execute('''
         CREATE TABLE IF NOT EXISTS payments (
-            id INTEGER PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
             username TEXT,
             amount REAL,
             city TEXT,
             timestamp TEXT
         )
     ''')
-
     c.execute('''
         CREATE TABLE IF NOT EXISTS paypal_orders (
             order_id TEXT PRIMARY KEY,
             custom_id TEXT
         )
     ''')
-
     c.execute('''
         CREATE TABLE IF NOT EXISTS pending_cities (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             submitted_by TEXT NOT NULL,
             timestamp TEXT NOT NULL
         )
     ''')
-
     c.execute('''
         CREATE TABLE IF NOT EXISTS approved_cities (
             name TEXT PRIMARY KEY
         )
     ''')
-
     conn.commit()
     conn.close()
 
@@ -80,25 +66,16 @@ def get_approved_cities():
         "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
         "Västerås", "Helsingborg", "Norrköping", "Jönköping"
     ]
-
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT name FROM approved_cities")
-    user_approved = [row[0] for row in c.fetchall()]
+    user_approved = [row['name'] for row in c.fetchall()]
     conn.close()
-
     combined = sorted(set(predefined + user_approved), key=str.lower)
-
     if "Other" in combined:
         combined.remove("Other")
         combined.append("Other")
-
     return combined
-
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 @app.before_request
 def restrict_admin():
@@ -109,11 +86,10 @@ def restrict_admin():
 def login():
     session.permanent = False
     session['admin'] = True
-
     error = None
     if request.method == 'POST':
         password = request.form.get('password')
-        if password == os.getenv("ADMIN_PASSWORD"):  # eller hårdkoda t.ex. 'superhemligt'
+        if password == os.getenv("ADMIN_PASSWORD"):
             session['admin'] = True
             return redirect(url_for('admin'))
         else:
@@ -124,20 +100,16 @@ def login():
 def logout():
     session.pop('admin', None)
     return redirect(url_for('index'))
-
 @app.route('/')
 def index():
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
 
-    # Pagination parameters
-    items_per_page = 10  # Configurable number of entries per page
-    player_page = int(request.args.get('player_page', 1))  # Default to page 1
-    city_page = int(request.args.get('city_page', 1))      # Default to page 1
+    items_per_page = 10
+    player_page = int(request.args.get('player_page', 1))
+    city_page = int(request.args.get('city_page', 1))
     player_offset = (player_page - 1) * items_per_page
     city_offset = (city_page - 1) * items_per_page
-
-    # Individual leaderboard with pagination
 
     c.execute("""
         SELECT username, (
@@ -146,70 +118,55 @@ def index():
             WHERE p2.username = p1.username 
             ORDER BY p2.timestamp DESC 
             LIMIT 1
-        ), SUM(amount) 
+        ) AS latest_city, SUM(amount) as total
         FROM payments p1 
         GROUP BY username 
-        ORDER BY SUM(amount) DESC 
-        LIMIT ? OFFSET ?
+        ORDER BY total DESC 
+        LIMIT %s OFFSET %s
     """, (items_per_page, player_offset))
 
-    # Add emoji based on total amount
     leaderboard = [
         (
             i + 1 + player_offset,
-            "👑 " + row[0] if row[2] >= 1000 else
-            "💎 " + row[0] if row[2] >= 500 else
-            "💰 " + row[0] if row[2] >= 100 else
-            row[0],
-            row[1],
-            row[2]
+            "👑 " + row['username'] if row['total'] >= 1000 else
+            "💎 " + row['username'] if row['total'] >= 500 else
+            "💰 " + row['username'] if row['total'] >= 100 else
+            row['username'],
+            row['latest_city'],
+            row['total']
         )
         for i, row in enumerate(c.fetchall())
     ]
 
-    available_images = [
-    'Stockholm', 'Göteborg', 'Malmö', 'Uppsala', 'Linköping', 'Örebro',
-    'Västerås', 'Helsingborg', 'Norrköping', 'Jönköping'
-    ]
-
-
-    # Total number of players for pagination
     c.execute("SELECT COUNT(DISTINCT username) FROM payments")
-    total_players = c.fetchone()[0]
+    total_players = c.fetchone()['count']
     total_player_pages = (total_players + items_per_page - 1) // items_per_page
 
-    # City leaderboard with pagination
     c.execute("""
-        SELECT city, COUNT(*) as donation_count, SUM(amount) 
+        SELECT city, COUNT(*) as donation_count, SUM(amount) as total 
         FROM payments 
         WHERE city IS NOT NULL 
         GROUP BY city 
-        ORDER BY SUM(amount) DESC 
-        LIMIT ? OFFSET ?
+        ORDER BY total DESC 
+        LIMIT %s OFFSET %s
     """, (items_per_page, city_offset))
-    city_leaderboard = [(i + 1 + city_offset, row[0], row[1], row[2]) for i, row in enumerate(c.fetchall())]
+    city_leaderboard = [
+        (i + 1 + city_offset, row['city'], row['donation_count'], row['total'])
+        for i, row in enumerate(c.fetchall())
+    ]
 
-    # Total number of cities for pagination
     c.execute("SELECT COUNT(DISTINCT city) FROM payments WHERE city IS NOT NULL")
-    total_cities = c.fetchone()[0]
+    total_cities = c.fetchone()['count']
     total_city_pages = (total_cities + items_per_page - 1) // items_per_page
 
     conn.close()
 
-    # Build a set of available city image filenames (without extension)
     image_dir = os.path.join(app.static_folder, 'images')
     available_images = {
         os.path.splitext(f)[0].lower()
         for f in os.listdir(image_dir)
         if f.endswith('.jpg')
     }
-    image_folder = os.path.join(app.static_folder, 'images')
-    available_images = [
-    os.path.splitext(filename)[0].lower()
-    for filename in os.listdir(image_folder)
-    if filename.endswith('.jpg')
-    ]   
-
 
     return render_template('index.html',
         leaderboard=leaderboard,
@@ -221,8 +178,6 @@ def index():
         total_city_pages=total_city_pages,
         available_images=available_images,
     )
-
-
 
 @app.route('/faq')
 def faq():
@@ -243,32 +198,28 @@ def payment_success():
     city = request.args.get('city')
 
     error = request.args.get('error')
-    error_message = None
-    if error == 'amount_too_small':
-        error_message = "The amount must be at least 1 SEK"
+    error_message = "The amount must be at least 1 SEK" if error == 'amount_too_small' else None
 
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
-
     c.execute("SELECT username, amount FROM payments ORDER BY amount DESC")
     leaderboard = c.fetchall()
 
     c.execute("""
-        SELECT city, COUNT(*) as donation_count, SUM(amount) 
-        FROM payments 
-        WHERE city IS NOT NULL 
-        GROUP BY city 
-        ORDER BY SUM(amount) DESC
+        SELECT city, COUNT(*) as donation_count, SUM(amount) as total
+        FROM payments
+        WHERE city IS NOT NULL
+        GROUP BY city
+        ORDER BY total DESC
     """)
-    city_leaderboard = [(i + 1, row[0], row[1], row[2]) for i, row in enumerate(c.fetchall())]
+    city_leaderboard = [
+        (i + 1, row['city'], row['donation_count'], row['total'])
+        for i, row in enumerate(c.fetchall())
+    ]
 
-    rank = None
-    for index, entry in enumerate(leaderboard):
-        if entry[0] == username:
-            rank = index + 1
-            break
-
+    rank = next((index + 1 for index, entry in enumerate(leaderboard) if entry['username'] == username), None)
     conn.close()
+
     return render_template('payment_success.html', username=username, amount=amount, 
                            city=city, error_message=error_message, rank=rank, city_leaderboard=city_leaderboard)
 
@@ -279,26 +230,21 @@ def pay():
     city = request.form.get('city')
     custom_city = request.form.get('custom_city')
 
-    if city.lower() in ['other', 'annan']:
-
-        if custom_city and custom_city.strip():
-            conn = sqlite3.connect(DATABASE_PATH)
-            c = conn.cursor()
-            c.execute(
-                "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (?, ?, ?)",
-                (custom_city.strip(), username, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    if city and city.lower() in ['other', 'annan'] and custom_city and custom_city.strip():
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (%s, %s, %s)",
+            (custom_city.strip(), username, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         )
         conn.commit()
         conn.close()
 
-    city = 'Other'  # så leaderboarden inte får custom direkt
-
-
+    city = 'Other' if city and city.lower() in ['other', 'annan'] else city
     if city == 'None' or not city:
         city = None
 
     return redirect(url_for('payment_page', username=username, amount=amount, city=city))
-
 
 @app.route('/payment')
 def payment_page():
@@ -324,23 +270,16 @@ def process_payment():
     except ValueError:
         return redirect(url_for('payment_page', error="Invalid amount"))
 
-    # Process based on payment method
-    if payment_method == "Swish":
-        phone = request.form.get('phone')
-        if not phone:
-            return redirect(url_for('payment_page', error="Phone number is required for Swish"))
+    if payment_method == "Swish" and not request.form.get('phone'):
+        return redirect(url_for('payment_page', error="Phone number is required for Swish"))
 
-    elif payment_method == "Credit Card":
-        card_number = request.form.get('card-number')
-        expiry = request.form.get('expiry')
-        cvc = request.form.get('cvc')
-        if not (card_number and expiry and cvc):
+    if payment_method == "Credit Card":
+        if not all([request.form.get('card-number'), request.form.get('expiry'), request.form.get('cvc')]):
             return redirect(url_for('payment_page', error="All credit card fields are required"))
 
-    # Insert into database
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO payments (username, amount, city, timestamp) VALUES (?, ?, ?, ?)",
+    c.execute("INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
               (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     conn.commit()
     conn.close()
@@ -349,22 +288,13 @@ def process_payment():
 
 @app.route('/paypal/webhook', methods=['POST'])
 def paypal_webhook():
-    print("🚨 Webhook träffad?")
-    print(f"Headers: {dict(request.headers)}")
-    print(f"Body: {request.get_data(as_text=True)}")
     try:
         data = request.get_json()
-        print("📥 Received webhook data:")
-        print(json.dumps(data, indent=2))
-
         event_type = data.get('event_type')
 
-        # Automatically handle CHECKOUT.ORDER.APPROVED → capture it
         if event_type == "CHECKOUT.ORDER.APPROVED":
             order_id = data["resource"]["id"]
-            print(f"⚡ Capturing order: {order_id}")
 
-            # Step 1: Get new access token
             auth_response = requests.post(
                 f"{PAYPAL_API_BASE}/v1/oauth2/token",
                 headers={'Accept': 'application/json'},
@@ -373,7 +303,6 @@ def paypal_webhook():
             )
             access_token = auth_response.json()['access_token']
 
-            # Step 2: Capture the order
             capture_response = requests.post(
                 f"{PAYPAL_API_BASE}/v2/checkout/orders/{order_id}/capture",
                 headers={
@@ -382,16 +311,10 @@ def paypal_webhook():
                 }
             )
 
-            print("💳 Capture response:")
-            print(json.dumps(capture_response.json(), indent=2))
-
             return jsonify({"status": "captured"}), 200
 
-        # This is the one that inserts into DB
         if event_type == 'PAYMENT.CAPTURE.COMPLETED':
             resource = data.get('resource', {})
-            print("🔥 Webhook resource payload:")
-            print(json.dumps(resource, indent=2))
             amount = 0
             try:
                 amount = float(resource.get('amount', {}).get('value', 0))
@@ -400,68 +323,43 @@ def paypal_webhook():
                     captures = resource.get('purchase_units', [{}])[0].get('payments', {}).get('captures', [])
                     if captures:
                         amount = float(captures[0].get('amount', {}).get('value', 0))
-                except Exception as e:
-                    print(f"⚠️ Failed to parse amount: {e}")
+                except:
+                    pass
 
-            print(f"📦 Extracted amount: {amount}")
-            # Get order ID from the webhook payload
             order_id = resource.get('supplementary_data', {}).get('related_ids', {}).get('order_id')
             if not order_id:
-                print("❌ Missing order_id in webhook capture")
                 return jsonify({'error': 'Missing order_id'}), 400
 
-            # Look up the custom_id from the local database
-            conn = sqlite3.connect(DATABASE_PATH)
+            conn = get_db_connection()
             c = conn.cursor()
-            c.execute("SELECT custom_id FROM paypal_orders WHERE order_id = ?", (order_id,))
+            c.execute("SELECT custom_id FROM paypal_orders WHERE order_id = %s", (order_id,))
             result = c.fetchone()
-            conn.close()
-
             if not result:
-                print(f"❌ No custom_id mapping found for order_id: {order_id}")
+                conn.close()
                 return jsonify({'error': 'Order not found'}), 404
 
-            custom_id = result[0]
+            custom_id = result['custom_id']
             username, city = custom_id.split('|')
             if city not in sweden_cities:
-                print(f"📝 '{city}' verkar vara en ny stad. Sparar till pending_cities...")
-                conn = sqlite3.connect(DATABASE_PATH)
-                c = conn.cursor()
                 c.execute(
-                    "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (?, ?, ?)",
+                    "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (%s, %s, %s)",
                     (city, username, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 )
-                conn.commit()
-                conn.close()
-            if amount < 1:
-                return jsonify({'error': 'Invalid amount'}), 400
 
-            # Insert payment
-            conn = sqlite3.connect(DATABASE_PATH)
-            c = conn.cursor()
-            c.execute(
-                "INSERT INTO payments (username, amount, city, timestamp) VALUES (?, ?, ?, ?)",
-                (username, amount, city if city != 'None' else None, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            )
+            if amount >= 1:
+                c.execute(
+                    "INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
+                    (username, amount, city if city != 'None' else None, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
+
             conn.commit()
             conn.close()
-
-            print(f"✅ Parsed payment: {username}, {city}, {amount} SEK")
-            print("✅ Payment inserted into DB.")
             return jsonify({'status': 'success'}), 200
 
-
-
-        # Ignore all other event types
-        print("ℹ️ Ignored event type:", event_type)
         return jsonify({'status': 'ignored'}), 200
 
     except Exception as e:
-        print("❌ Webhook processing failed:", str(e))
         return jsonify({'error': 'Webhook error'}), 500
-
-
-
 
 @app.route('/create-paypal-order', methods=['POST'])
 def create_paypal_order():
@@ -470,23 +368,20 @@ def create_paypal_order():
     amount = float(data.get('amount'))
     city = data.get('city') or 'None'
 
-    # 🔥 Om någon angett manuell stad, spara i pending_cities
-    if '|' in city:  # quick check if it's in format "Username|City"
-        city_parts = city.split('|')
-        if len(city_parts) == 2:
-            raw_city = city_parts[1]
+    if '|' in city:
+        parts = city.split('|')
+        if len(parts) == 2:
+            raw_city = parts[1]
             if raw_city.lower() not in [c.lower() for c in sweden_cities] and raw_city.lower() != 'other':
-                conn = sqlite3.connect(DATABASE_PATH)
+                conn = get_db_connection()
                 c = conn.cursor()
                 c.execute(
-                    "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (?, ?, ?)",
+                    "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (%s, %s, %s)",
                     (raw_city, username, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 )
                 conn.commit()
                 conn.close()
 
-
-    # Step 1: Get Access Token
     auth_response = requests.post(
         f'{PAYPAL_API_BASE}/v1/oauth2/token',
         headers={'Accept': 'application/json'},
@@ -495,7 +390,6 @@ def create_paypal_order():
     )
     access_token = auth_response.json()['access_token']
 
-    # Step 2: Create order
     order_response = requests.post(
         f'{PAYPAL_API_BASE}/v2/checkout/orders',
         headers={
@@ -525,10 +419,9 @@ def create_paypal_order():
     order_id = order['id']
     custom_id = f"{username}|{city}"
 
-    # Save to DB
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT OR REPLACE INTO paypal_orders (order_id, custom_id) VALUES (?, ?)", (order_id, custom_id))
+    c.execute("INSERT INTO paypal_orders (order_id, custom_id) VALUES (%s, %s) ON CONFLICT (order_id) DO UPDATE SET custom_id = EXCLUDED.custom_id", (order_id, custom_id))
     conn.commit()
     conn.close()
 
@@ -539,27 +432,27 @@ def create_paypal_order():
 def admin():
     if not session.get('admin'):
         return redirect(url_for('login'))
-    
-    conn = sqlite3.connect(DATABASE_PATH)
+
+    conn = get_db_connection()
     c = conn.cursor()
 
     if request.method == 'POST':
         approved_ids = request.form.getlist('approve')
         for city_id in approved_ids:
-            c.execute("SELECT name, submitted_by FROM pending_cities WHERE id = ?", (city_id,))
+            c.execute("SELECT name, submitted_by FROM pending_cities WHERE id = %s", (city_id,))
             result = c.fetchone()
             if result:
-                city_name, submitted_by = result
-                c.execute("INSERT OR IGNORE INTO approved_cities (name) VALUES (?)", (city_name,))
+                city_name = result['name']
+                submitted_by = result['submitted_by']
+                c.execute("INSERT INTO approved_cities (name) VALUES (%s) ON CONFLICT DO NOTHING", (city_name,))
                 c.execute("""
                     UPDATE payments 
-                    SET city = ? 
-                    WHERE city = 'Other' AND username = ?
+                    SET city = %s 
+                    WHERE city = 'Other' AND username = %s
                 """, (city_name, submitted_by))
-                c.execute("DELETE FROM pending_cities WHERE id = ?", (city_id,))
+                c.execute("DELETE FROM pending_cities WHERE id = %s", (city_id,))
         conn.commit()
-    
-    # 💡 Oavsett GET eller POST – hämta pending cities och rendera admin-sidan
+
     c.execute("SELECT id, name, submitted_by, timestamp FROM pending_cities")
     pending = c.fetchall()
     conn.close()
@@ -572,32 +465,18 @@ def create_checkout_session():
     city = request.form.get('city')
     custom_city = request.form.get('custom_city', '').strip()
 
-    # Om användaren valde "Other" och skrev något
-    if city == 'Other' and custom_city:
-        conn = sqlite3.connect(DATABASE_PATH)
+    if city.lower() in ['other', 'annan'] and custom_city:
+        conn = get_db_connection()
         c = conn.cursor()
         c.execute(
-            "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (?, ?, ?)",
-            (custom_city, username, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        )
-        conn.commit()
-        conn.close()
-        city = 'Other'  # Fortfarande för leaderboard
-
-    # Ersätt med manuellt inskriven stad om vald
-    if city.lower() in ['annan', 'other'] and custom_city.strip():
-        conn = sqlite3.connect(DATABASE_PATH)
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (?, ?, ?)",
+            "INSERT INTO pending_cities (name, submitted_by, timestamp) VALUES (%s, %s, %s)",
             (custom_city.strip(), username, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         )
         conn.commit()
         conn.close()
         city = 'Other'
 
-
-    session = stripe.checkout.Session.create(
+    session_obj = stripe.checkout.Session.create(
         payment_method_types=['card'],
         mode='payment',
         line_items=[{
@@ -615,10 +494,10 @@ def create_checkout_session():
             'amount': amount / 100,
             'city': city,
         },
-        success_url = url_for('success', username=username, amount=amount / 100, city=city, _external=True),
+        success_url=url_for('success', username=username, amount=amount / 100, city=city, _external=True),
         cancel_url=url_for('index', _external=True),
     )
-    return redirect(session.url, code=303)
+    return redirect(session_obj.url, code=303)
 
 @app.route('/success')
 def success():
@@ -626,33 +505,20 @@ def success():
     amount = request.args.get('amount')
     city = request.args.get('city')
 
-    # Hämta rank från databasen
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT username, SUM(amount) FROM payments GROUP BY username ORDER BY SUM(amount) DESC")
+    c.execute("SELECT username, SUM(amount) as total FROM payments GROUP BY username ORDER BY total DESC")
     leaderboard = c.fetchall()
 
-    rank = None
-    for index, entry in enumerate(leaderboard):
-        if entry[0] == username:
-            rank = index + 1
-            break
-
+    rank = next((index + 1 for index, entry in enumerate(leaderboard) if entry['username'] == username), None)
     conn.close()
 
-    return render_template('success.html',
-                           username=username,
-                           amount=amount,
-                           city=city,
-                           rank=rank)
-
+    return render_template('success.html', username=username, amount=amount, city=city, rank=rank)
 
 @app.route('/stripe/webhook', methods=['POST'])
 def stripe_webhook():
-    import json
     payload = request.data
     sig_header = request.headers.get('stripe-signature')
-    endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
@@ -660,34 +526,22 @@ def stripe_webhook():
         return str(e), 400
 
     if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        metadata = session.get('metadata', {})
+        session_data = event['data']['object']
+        metadata = session_data.get('metadata', {})
         username = metadata.get('username')
         amount = float(metadata.get('amount'))
         city = metadata.get('city')
 
         conn = get_db_connection()
-        cursor = conn.cursor()
-
-        if event['type'] == 'checkout.session.completed':
-            print("✅ Stripe webhook: Session completed")
-            print(json.dumps(event, indent=2))
-
-            session = event['data']['object']
-            metadata = session.get('metadata', {})
-            print(f"📦 Metadata: {metadata}")
-            
-        cursor.execute("""
-            INSERT INTO payments (username, amount, city, timestamp)
-            VALUES (?, ?, ?, ?)
-        """, (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-
-
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
+            (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
         conn.commit()
         conn.close()
 
     return '', 200
-
 
 @app.route('/admin/manual-add', methods=['POST'])
 def manual_add():
@@ -703,11 +557,11 @@ def manual_add():
     except ValueError:
         return "Ogiltigt belopp"
 
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
         INSERT INTO payments (username, amount, city, timestamp)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """, (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     conn.commit()
     conn.close()
