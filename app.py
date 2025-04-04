@@ -27,11 +27,6 @@ app = Flask(__name__)
 DATABASE_PATH = os.getenv("DATABASE_PATH", "/data/database.db")
 app.secret_key = os.getenv("FLASK_SECRET")
 
-@app.before_first_request
-def initialize():
-    init_db()
-
-
 
 def init_db():
     database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
@@ -72,7 +67,8 @@ def init_db():
 
     conn.commit()
     conn.close()
-
+    
+init_db()
 
 sweden_cities = [
     "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
