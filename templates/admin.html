@@ -44,14 +44,15 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for id, name, submitted_by, timestamp in pending %}
+                    {% for row in pending %}
                     <tr>
-                        <td><input type="checkbox" name="approve" value="{{ id }}"></td>
-                        <td>{{ name }}</td>
-                        <td>{{ submitted_by }}</td>
-                        <td>{{ timestamp }}</td>
+                        <td><input type="checkbox" name="approve" value="{{ row.id }}"></td>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.submitted_by }}</td>
+                        <td>{{ row.timestamp }}</td>
                     </tr>
                     {% endfor %}
+                    
                 </tbody>
             </table>
             <br>

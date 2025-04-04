@@ -647,7 +647,8 @@ def update_payment():
     conn.commit()
     conn.close()
 
-    return redirect(url_for('admin_edit_payments'))
+
+    return redirect(url_for('admin'))
 
 @app.route('/admin/delete-payment', methods=['POST'])
 def delete_payment():
