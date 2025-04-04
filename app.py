@@ -549,21 +549,25 @@ def stripe_webhook():
 
     if event['type'] == 'checkout.session.completed':
         session_data = event['data']['object']
-        metadata = session_data.get('metadata', {})
-        username = metadata.get('username')
-        amount = float(metadata.get('amount'))
-        city = metadata.get('city')
 
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
-            (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        )
-        conn.commit()
-        conn.close()
+        # ✅ Only proceed if payment was successful
+        if session_data.get("payment_status") == "paid":
+            metadata = session_data.get('metadata', {})
+            username = metadata.get('username')
+            amount = float(metadata.get('amount'))
+            city = metadata.get('city')
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute(
+                "INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
+                (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            )
+            conn.commit()
+            conn.close()
 
     return '', 200
+
 
 @app.route('/admin/manual-add', methods=['POST'])
 def manual_add():
