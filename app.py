@@ -27,6 +27,9 @@ app = Flask(__name__)
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 app.secret_key = os.getenv("FLASK_SECRET")
 
+
+
+
 def init_db():
     database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
     print(f"Initializing database at: {database_path}")
@@ -44,6 +47,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+init_db()
 sweden_cities = [
     "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
     "Västerås", "Helsingborg", "Norrköping", "Jönköping", "Other"
@@ -663,6 +667,3 @@ def stripe_webhook():
     return '', 200
 
 
-if __name__ == '__main__':
-    init_db()
-    app.run(debug=True, host='0.0.0.0')  # Lägg till host!
