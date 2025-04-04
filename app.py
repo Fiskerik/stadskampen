@@ -27,7 +27,9 @@ app = Flask(__name__)
 DATABASE_PATH = os.getenv("DATABASE_PATH", "/data/database.db")
 app.secret_key = os.getenv("FLASK_SECRET")
 
-
+@app.before_first_request
+def initialize():
+    init_db()
 
 
 def init_db():
@@ -71,7 +73,6 @@ def init_db():
     conn.close()
 
 
-init_db()
 sweden_cities = [
     "Stockholm", "Gothenburg", "Malmö", "Uppsala", "Linköping", "Örebro", 
     "Västerås", "Helsingborg", "Norrköping", "Jönköping"
@@ -715,3 +716,7 @@ def manual_add():
     conn.close()
 
     return redirect(url_for('admin'))
+
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=True)
