@@ -590,46 +590,6 @@ def manual_add():
 
     return redirect(url_for('admin'))
 
-@app.route('/init-add-message-column')
-def init_add_message_column():
-    if not session.get('admin'):
-        return redirect(url_for('login'))  # Säkerhetskontroll
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    try:
-        c.execute("ALTER TABLE payments ADD COLUMN message TEXT")
-        conn.commit()
-        return "✅ Kolumn 'message' har lagts till!"
-    except psycopg2.errors.DuplicateColumn:
-        conn.rollback()
-        return "ℹ️ Kolumnen 'message' finns redan."
-    except Exception as e:
-        conn.rollback()
-        return f"❌ Något gick fel: {e}"
-    finally:
-        conn.close()
-        
-@app.route('/add-message-column')
-def add_message_column():
-    if not session.get('admin'):
-        return redirect(url_for('login'))
-
-    conn = get_db_connection()
-    c = conn.cursor()
-    try:
-        c.execute("ALTER TABLE payments ADD COLUMN message TEXT")
-        conn.commit()
-        return "✅ Kolumn 'message' har lagts till!"
-    except psycopg2.errors.DuplicateColumn:
-        conn.rollback()
-        return "ℹ️ Kolumnen 'message' finns redan."
-    except Exception as e:
-        conn.rollback()
-        return f"❌ Fel: {e}"
-    finally:
-        conn.close()
-
 
 if __name__ == "__main__":
     init_db()
