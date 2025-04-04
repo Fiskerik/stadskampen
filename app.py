@@ -481,10 +481,16 @@ def admin():
                 c.execute("DELETE FROM pending_cities WHERE id = %s", (city_id,))
         conn.commit()
 
+    # Fetch pending cities
     c.execute("SELECT id, name, submitted_by, timestamp FROM pending_cities")
     pending = c.fetchall()
+
+    # Fake total_pages = 1 if you don't use pagination yet
+    total_pages = 1
+
     conn.close()
-    return render_template('admin.html', pending=pending)
+    return render_template('admin.html', pending=pending, total_pages=total_pages)
+
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
