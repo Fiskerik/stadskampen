@@ -675,18 +675,15 @@ def delete_payment():
 
     return jsonify({'status': 'deleted'})
 
-@app.route('/admin/add-message-column')
-def add_message_column():
+@app.route('/admin/add-paypal-message')
+def add_paypal_message_column():
     conn = get_db_connection()
     c = conn.cursor()
-    try:
-        c.execute('ALTER TABLE paypal_orders ADD COLUMN "message" TEXT')
-        conn.commit()
-        return "Column 'message' added successfully!"
-    except Exception as e:
-        return f"Error: {str(e)}"
-    finally:
-        conn.close()
+    c.execute('ALTER TABLE paypal_orders ADD COLUMN message TEXT')
+    conn.commit()
+    conn.close()
+    return 'Column added successfully.'
+
 
 
 
