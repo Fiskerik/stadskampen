@@ -36,7 +36,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS paypal_orders (
             order_id TEXT PRIMARY KEY,
             custom_id TEXT
-            "message" TEXT
+           
         )
     ''')
     c.execute('''
@@ -674,6 +674,20 @@ def delete_payment():
     conn.close()
 
     return jsonify({'status': 'deleted'})
+
+@app.route('/admin/add-message-column')
+def add_message_column():
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute('ALTER TABLE paypal_orders ADD COLUMN "message" TEXT')
+        conn.commit()
+        return "Column 'message' added successfully!"
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        conn.close()
+
 
 
 if __name__ == "__main__":
