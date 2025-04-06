@@ -36,6 +36,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS paypal_orders (
             order_id TEXT PRIMARY KEY,
             custom_id TEXT
+            message TEXT
         )
     ''')
     c.execute('''
@@ -238,13 +239,13 @@ def payment_success():
 @app.route('/pay', methods=['POST'])
 def pay():
     username = request.form['username']
-    amount = float(request.form['amount'])
+    amount = request.form['amount']
     city = request.form.get('city')
     custom_city = request.form.get('custom_city')
     message = request.form.get('message')
 
-    # Hantera specialfallet där custom stad anges
     if city and city.lower() in ['övrig', 'annan'] and custom_city and custom_city.strip():
+        # Save pending city immediately (this part is okay)
         conn = get_db_connection()
         c = conn.cursor()
         c.execute(
@@ -258,17 +259,9 @@ def pay():
     if city == 'None' or not city:
         city = None
 
-    # Spara betalningen (inkl. hälsning)
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO payments (username, amount, city, timestamp, message)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (username, amount, city, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message))
-    conn.commit()
-    conn.close()
+    # Pass info to the payment options page (or pass via session instead)
+    return redirect(url_for('payment_page', username=username, amount=amount, city=city, message=message))
 
-    return redirect(url_for('payment_page', username=username, amount=amount, city=city))
 
 
 @app.route('/payment')
@@ -276,6 +269,7 @@ def payment_page():
     username = request.args.get('username')
     amount = request.args.get('amount')
     city = request.args.get('city')
+    message = request.args.get('message') 
     return render_template('payment.html', username=username, amount=amount, city=city)
 
 @app.route('/process-payment', methods=['POST'])
@@ -375,10 +369,16 @@ def paypal_webhook():
                 )
 
             if amount >= 1:
+                # Get message from paypal_orders
+                c.execute("SELECT message FROM paypal_orders WHERE order_id = %s", (order_id,))
+                msg_row = c.fetchone()
+                message = msg_row['message'] if msg_row else None
+
                 c.execute(
-                    "INSERT INTO payments (username, amount, city, timestamp) VALUES (%s, %s, %s, %s)",
-                    (username, amount, city if city != 'None' else None, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    "INSERT INTO payments (username, amount, city, timestamp, message) VALUES (%s, %s, %s, %s, %s)",
+                    (username, amount, city if city != 'None' else None, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message)
                 )
+
 
             conn.commit()
             conn.close()
@@ -449,7 +449,14 @@ def create_paypal_order():
 
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO paypal_orders (order_id, custom_id) VALUES (%s, %s) ON CONFLICT (order_id) DO UPDATE SET custom_id = EXCLUDED.custom_id", (order_id, custom_id))
+    c.execute("""
+    INSERT INTO paypal_orders (order_id, custom_id, message)
+    VALUES (%s, %s, %s)
+    ON CONFLICT (order_id) DO UPDATE
+    SET custom_id = EXCLUDED.custom_id,
+        message = EXCLUDED.message
+    """, (order_id, custom_id, data.get('message')))
+
     conn.commit()
     conn.close()
 
@@ -495,6 +502,7 @@ def create_checkout_session():
     amount = int(float(request.form.get('amount')) * 100)
     city = request.form.get('city')
     custom_city = request.form.get('custom_city', '').strip()
+    message = request.form.get('message')
 
     if city.lower() in ['övrig', 'annan'] and custom_city:
         conn = get_db_connection()
@@ -524,6 +532,7 @@ def create_checkout_session():
             'username': username,
             'amount': amount / 100,
             'city': city,
+            'message': message  # ✅ add this
         },
         success_url=url_for('success', username=username, amount=amount / 100, city=city, _external=True),
         cancel_url=url_for('index', _external=True),

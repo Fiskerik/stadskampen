@@ -88,6 +88,8 @@
                     <input type="hidden" name="username" id="hidden-username" value="{{ username }}">
                     <input type="hidden" name="amount" id="hidden-amount" value="{{ amount }}">
                     <input type="hidden" name="city" id="hidden-city" value="{{ city }}">
+                    <input type="hidden" name="message" id="hidden-message" value="{{ message or '' }}">
+
                   
                     <!-- Paypal-form -->
                     <div id="paypal-form" class="payment-form active">
@@ -141,8 +143,10 @@
             body: JSON.stringify({
             username: username,
             amount: amount,
-            city: city
+            city: city,
+            message: document.getElementById('hidden-message').value
             })
+
         })
         .then(res => res.json())
         .then(data => {
