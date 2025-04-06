@@ -33,13 +33,6 @@ def init_db():
         )
     ''')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS paypal_orders (
-            order_id TEXT PRIMARY KEY,
-            custom_id TEXT
-            "message" TEXT
-        )
-    ''')
-    c.execute('''
         CREATE TABLE IF NOT EXISTS pending_cities (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
