@@ -97,7 +97,7 @@
     <!-- Block 2: Form -->
     <section class="block">
         <h2>Ange dina uppgifter</h2>
-        <form method="POST" action="{{ url_for('create_checkout_session') }}" id="payment-form">
+        <form method="POST" action="{{ url_for('pay') }}" id="payment-form">
 
             <label for="username">Användarnamn (minst 3 tecken):</label><br>
             <input type="text" name="username" id="username" placeholder="Ange Användarnamn" required><br>
